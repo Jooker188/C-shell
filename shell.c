@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
+#include <signal.h>
 
 
 /************* DÉFINITION DES CONSTANTES *************/
@@ -17,6 +17,12 @@
 #define MAGENTA "\033[1;35m"
 #define RED "\033[1;31m"
 #define RESET "\033[0m"
+
+
+
+/************* DÉFINITION DES VARIABLES GLOBALES *************/
+
+int running = 1;
 
 
 
@@ -40,6 +46,8 @@ char* get_user_input(){
     char input[MAX_INPUT_SIZE];
     //lire l'entrée utilisateur depuis le clavier (stdin) et stocker dans input
     fgets(input, sizeof(input), stdin);
+    //supprime le caractère de saut de ligne à la fin
+    input[strcspn(input, "\n")] = '\0';
 
     //si on tape exit, ça termine le processus
     if (strcmp(input, "exit") == 0) {
@@ -52,7 +60,7 @@ char* get_user_input(){
     return input_copy;
 }
 
-void use_shell(char* input){
+void execute_command(char* command){
     //création d'un processus enfant
     pid_t pid = fork();
 
@@ -63,9 +71,9 @@ void use_shell(char* input){
         //tableau de pointeurs car execvp attends ça
         // "/bin/bash" : chemin vers executable bash
         // "-c" : spécifie qu'on execute bash avec une commande
-        // "input" : représente la commande
+        // "command" : représente la commande
         // "NULL" : si pas présent, bug d'adressage execvp
-        char *args[] = {"/bin/bash", "-c", input, NULL};
+        char *args[] = {"/bin/bash", "-c", command, NULL};
 
         //execution de bash (args[0]) avec le tableau de pointeurs
         execvp(args[0], args);
@@ -79,19 +87,46 @@ void use_shell(char* input){
     }
 }
 
+void cd(char* path) {
+    chdir(path);
+}
+
+void stop() {
+    printf("\nSignal SIGINT reçu.\n");
+    running = 0;
+    exit(0);
+}
 
 /************* CORPS PRINCIPAL DU PROGRAMME *************/
 
 int main() {
-    while (1) {
+
+    // Si jamais le prog recoit un signal SIGINT, on rentre dans stop() puis on met running sur 0
+    signal(SIGINT, stop);
+
+    while (running) {
         //affiche du prompt
         display_prompt();
         
         //récupération de l'entrée utilisateur
         char* input = get_user_input();
 
-        //éxecution de l'entrée utilisateur avec bash
-        use_shell(input);
+        if (strcmp(input, "cd") == 0) {
+            //répertoire personnel de l'utilisateur
+            cd(getenv("HOME"));
+        } else if (strncmp(input, "cd ", 3) == 0) {
+            //traitement des commandes "cd" avec un chemin spécifié
+            //récupération du chemin apres "cd " (3 carac)
+            char *path = input + 3;
+            cd(path);
+        } else {
+            //éxécuter les autres commandes avec bash
+            execute_command(input);
+        }
+
+        //on libère la mémoire allouée par strdup
+        free(input);
     }
+    
     return 0;
 }
