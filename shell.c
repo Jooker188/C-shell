@@ -99,10 +99,28 @@ void stop() {
 
 /************* CORPS PRINCIPAL DU PROGRAMME *************/
 
-int main() {
+int main(int argc, char *argv[]) {
 
-    // Si jamais le prog recoit un signal SIGINT, on rentre dans stop() puis on met running sur 0
+    //si jamais le prog recoit un signal SIGINT, on rentre dans stop() puis on met running sur 0
     signal(SIGINT, stop);
+    
+    //si y'a des arguments
+    if (argc > 1){
+        //on les parcours
+        for (int i = 1; i < argc; i++) {
+            //si l'argument courant est "-c"
+            if (strcmp(argv[i], "-c") == 0){
+                //on execute la commande avec ce shell bash
+                execute_command(argv[i+1]);
+                exit(0);
+            }
+            //sinon on affiche la syntaxe
+            else{
+                fprintf(stderr, "Usage: %s [-c command]\n", argv[0]);
+                exit(0);
+            }
+        }
+    }
 
     while (running) {
         //affiche du prompt
